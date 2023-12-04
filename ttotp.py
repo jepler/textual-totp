@@ -142,7 +142,7 @@ class TOTPData:
         if generation != self.generation:
             self.generation = generation
             self.value_widget.update("*" * self.totp.digits)
-        self.progress_widget.progress = self.totp.interval - progress + 1
+        self.progress_widget.progress = self.totp.interval - progress
 
 class TTOTP(App[None]):
 
