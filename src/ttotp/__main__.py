@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import time
 import hashlib
@@ -117,6 +117,8 @@ default_conffile = platformdirs.user_config_path("ttotp") / "settings.toml"
 
 
 class TOTPLabel(Label, can_focus=True):
+    otp: "TOTPData"
+
     BINDINGS = [
         Binding("c", "copy", "Copy code", show=True),
         Binding("s", "show", "Show code", show=True),
@@ -124,9 +126,12 @@ class TOTPLabel(Label, can_focus=True):
         Binding("down", "focus_next", show=False),
     ]
 
-    @property
-    def idx(self) -> int:
-        return int(self.css_class.split("-")[1])
+    def __init__(self, otp: TOTPData) -> None:
+        self.otp = otp
+        super().__init__(
+            f"{otp.totp.name} / {otp.totp.issuer}",
+            classes=f"otp-name otp-name-{otp.id} otp-{otp.id}",
+            expand=True)
 
     @property
     def css_class(self) -> str:
@@ -149,6 +154,7 @@ class TOTPLabel(Label, can_focus=True):
 
     def on_blur(self) -> None:
         self.related_remove_class("otp-focused")
+        self.otp.value_widget.update("*" * self.otp.totp.digits)
         self.shown = False
 
     def on_focus(self) -> None:
@@ -158,10 +164,29 @@ class TOTPLabel(Label, can_focus=True):
 @dataclass
 class TOTPData:
     totp: pyotp.TOTP
-    name_widget: Label
-    value_widget: Label
-    progress_widget: ProgressBar
     generation = None
+    name_widget: Label = field(init=False)
+    value_widget: Label = field(init=False)
+    progress_widget: ProgressBar = field(init=False)
+
+    @property
+    def id(self) -> int:
+        return id(self)
+
+    def __post_init__(self) -> None:
+        self.name_widget = TOTPLabel(self)
+
+        self.value_widget = Label(
+            "*" * self.totp.digits,
+            classes=f"otp-value otp-value-{self.id} otp-{self.id}",
+            expand=True
+        )
+        self.progress_widget = ProgressBar(
+            classes=f"otp-progress otp-progress-{self.id} otp-{self.id}",
+            show_percentage=False,
+            show_eta=False,
+        )
+        self.progress_widget.total = self.totp.interval
 
     def tick(self, now: float) -> None:
         generation, progress = divmod(now, self.totp.interval)
@@ -169,6 +194,10 @@ class TOTPData:
             self.generation = generation
             self.value_widget.update("*" * self.totp.digits)
         self.progress_widget.progress = self.totp.interval - progress
+
+    @property
+    def widgets(self) -> Sequence[Widget]:
+        return self.value_widget, self.name_widget, self.progress_widget
 
 
 class TTOTP(App[None]):
@@ -188,7 +217,7 @@ class TTOTP(App[None]):
     def __init__(self, tokens: Sequence[pyotp.TOTP]) -> None:
         super().__init__()
         self.tokens = tokens
-        self.otp_data: Dict[int | pyotp.TOTP, TOTPData] = {}
+        self.otp_data: list[TOTPData] = []
         self.timer: Timer | None = None
         self.clear_clipboard_time: Timer | None = None
         self.copied = ''
@@ -207,46 +236,28 @@ class TTOTP(App[None]):
 
     def timer_func(self) -> None:
         now = time.time()
-        for otp in self.otp_data.values():
+        for otp in self.otp_data:
             otp.tick(now)
 
     def compose(self) -> ComposeResult:
         yield Footer()
         with VerticalScroll() as v:
             v.can_focus = False
-            for i, otp in enumerate(self.tokens):
-                otp_name = TOTPLabel(
-                    f"{otp.name} / {otp.issuer}",
-                    classes=f"otp-name otp-name-{i} otp-{i}",
-                    expand=True,
-                )
-                otp_value = Label(
-                    "", classes=f"otp-value otp-value-{i} otp-{i}", expand=True
-                )
-                otp_progress = ProgressBar(
-                    classes=f"otp-progress otp-progress-{i} otp-{i}",
-                    show_percentage=False,
-                    show_eta=False,
-                )
-
-                otp_progress.total = otp.interval
-                otpdata = TOTPData(otp, otp_name, otp_value, otp_progress)
-                self.otp_data[otp] = self.otp_data[i] = otpdata
-
-                yield otp_value
-                yield otp_name
-                yield otp_progress
+            for otp in self.tokens:
+                data = TOTPData(otp)
+                self.otp_data.append(data)
+                yield from data.widgets
 
     def action_show(self) -> None:
         widget = self.focused
         if widget is not None:
-            otp = self.otp_data[cast(TOTPLabel, widget).idx]
+            otp = cast(TOTPLabel, widget).otp
             otp.value_widget.update(otp.totp.now())
 
     def action_copy(self) -> None:
         widget = self.focused
         if widget is not None:
-            otp = self.otp_data[cast(TOTPLabel, widget).idx]
+            otp = cast(TOTPLabel, widget).otp
             code = otp.totp.now()
             pyperclip_copy(code)
             self.copied = code
