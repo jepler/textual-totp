@@ -219,7 +219,8 @@ class TTOTP(App[None]):
 
 @click.command
 @click.option("--config", type=pathlib.Path, default=default_conffile, help="Configuration file to use")
-def main(config):
+@click.option("--profile", type=str, default=None, help="Profile to use within the configuration file")
+def main(config, profile):
 
     def config_hint():
         config.parent.mkdir(parents=True, exist_ok=True)
@@ -231,6 +232,12 @@ One way to do this is with the `pass` program from https://www.passwordstore.org
 (it keeps your secrets safe using GPG):
 
     otp-command = ['pass', 'totp-tokens']
+
+You can have multiple profiles as configuration file sections:
+
+    [work]
+    otp-command = ['pass', 'totp-tokens-work']
+
 """)
         raise SystemExit(2)
 
@@ -241,6 +248,9 @@ One way to do this is with the `pass` program from https://www.passwordstore.org
         config_data = tomllib.load(f)
 
     print(config_data)
+
+    if profile:
+        config_data = config_data[profile]
 
     otp_command = config_data.get('otp-command')
     if otp_command is None:
