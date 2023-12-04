@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2020 Diego Elio Pettenò
+#
+# SPDX-License-Identifier: Unlicense
+
+default_language_version:
+  python: python3
+
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.5.0
+  hooks:
+  -   id: check-yaml
+  -   id: end-of-file-fixer
+      exclude: tests
+  -   id: trailing-whitespace
+      exclude: tests
+-   repo: https://github.com/codespell-project/codespell
+    rev: v2.2.6
+    hooks:
+    -   id: codespell
+        args: [-w]
+- repo: https://github.com/fsfe/reuse-tool
+  rev: v2.1.0
+  hooks:
+  - id: reuse
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.1.6
+  hooks:
+    # Run the linter.
+    - id: ruff
+      args: [ --fix, --preview ]
+    # Run the formatter.
+    - id: ruff-format

@@ -1,4 +1,10 @@
-# textual-totp: TOTP (authenticator) application using Python & Textual 
+<!--
+SPDX-FileCopyrightText: 2023 Jeff Epler
+
+SPDX-License-Identifier: MIT
+-->
+
+# textual-totp: TOTP (authenticator) application using Python & Textual
 
 # Installation
 

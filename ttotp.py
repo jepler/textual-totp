@@ -1,5 +1,9 @@
 #!/usr/bin/python3
 
+# SPDX-FileCopyrightText: 2023 Jeff Epler
+#
+# SPDX-License-Identifier: MIT
+
 from dataclasses import dataclass
 
 import time
@@ -19,6 +23,7 @@ import click
 import pyotp
 import platformdirs
 import tomllib
+
 
 # Copied from pyotp with the issuer mismatch check removed
 def parse_uri(uri: str) -> pyotp.OTP:
@@ -66,7 +71,9 @@ def parse_uri(uri: str) -> pyotp.OTP:
             elif value == "SHA512":
                 otp_data["digest"] = hashlib.sha512
             else:
-                raise ValueError("Invalid value for algorithm, must be SHA1, SHA256 or SHA512")
+                raise ValueError(
+                    "Invalid value for algorithm, must be SHA1, SHA256 or SHA512"
+                )
         elif key == "digits":
             digits = int(value)
             if digits not in [6, 7, 8]:
@@ -90,7 +97,9 @@ def parse_uri(uri: str) -> pyotp.OTP:
 
     raise ValueError("Not a supported OTP type")
 
+
 default_conffile = platformdirs.user_config_path("ttotp") / "settings.toml"
+
 
 class TOTPLabel(Label, can_focus=True):
     BINDINGS = [
@@ -99,21 +108,21 @@ class TOTPLabel(Label, can_focus=True):
         Binding("up", "focus_previous", show=False),
         Binding("down", "focus_next", show=False),
     ]
-    
+
     @property
     def idx(self):
-        return int(self.css_class.split('-')[1])
+        return int(self.css_class.split("-")[1])
 
     @property
     def css_class(self):
         for c in self.classes:
-            if re.match('otp-[0-9]', c):
+            if re.match("otp-[0-9]", c):
                 return c
         return None
 
     @property
-    def related(self, arg=''):
-        return self.screen.query(f'.{self.css_class}{arg}')
+    def related(self, arg=""):
+        return self.screen.query(f".{self.css_class}{arg}")
 
     def related_remove_class(self, cls):
         for widget in self.related:
@@ -129,6 +138,7 @@ class TOTPLabel(Label, can_focus=True):
 
     def on_focus(self):
         self.related_add_class("otp-focused")
+
 
 @dataclass
 class TOTPData:
@@ -146,9 +156,9 @@ class TOTPData:
             self.value_widget.update("*" * self.totp.digits)
         self.progress_widget.progress = self.totp.interval - progress
 
-class TTOTP(App[None]):
 
-    CSS = '''
+class TTOTP(App[None]):
+    CSS = """
     VerticalScroll {
         layout: grid;
         grid-size: 2;
@@ -159,7 +169,7 @@ class TTOTP(App[None]):
     ProgressBar { column-span: 2; }
     Bar > .bar--bar { color: $success; }
     Bar { width: 1fr; }
-    '''
+    """
 
     def __init__(self, tokens):
         super().__init__()
@@ -171,13 +181,15 @@ class TTOTP(App[None]):
 
     def on_mount(self):
         self.timer_func()
-        self.timer = self.set_interval(.1, self.timer_func)
-        self.clear_clipboard_timer = self.set_timer(30, self.clear_clipboard_func, pause=True)
+        self.timer = self.set_interval(0.1, self.timer_func)
+        self.clear_clipboard_timer = self.set_timer(
+            30, self.clear_clipboard_func, pause=True
+        )
 
     def clear_clipboard_func(self):
         if pyperclip.paste() == self.copied:
             self.notify("Clipboard cleared", title="")
-            pyperclip.copy('')
+            pyperclip.copy("")
 
     def timer_func(self):
         now = time.time()
@@ -189,14 +201,24 @@ class TTOTP(App[None]):
         with VerticalScroll() as v:
             v.can_focus = False
             for i, otp in enumerate(self.tokens):
-                otp_name = TOTPLabel(f"{otp.name} / {otp.issuer}", classes=f"otp-name otp-name-{i} otp-{i}", expand=True)
-                otp_value = Label("", classes=f"otp-value otp-value-{i} otp-{i}", expand=True)
-                otp_progress = ProgressBar(classes=f"otp-progress otp-progress-{i} otp-{i}", show_percentage=False, show_eta=False)
+                otp_name = TOTPLabel(
+                    f"{otp.name} / {otp.issuer}",
+                    classes=f"otp-name otp-name-{i} otp-{i}",
+                    expand=True,
+                )
+                otp_value = Label(
+                    "", classes=f"otp-value otp-value-{i} otp-{i}", expand=True
+                )
+                otp_progress = ProgressBar(
+                    classes=f"otp-progress otp-progress-{i} otp-{i}",
+                    show_percentage=False,
+                    show_eta=False,
+                )
 
                 otp_progress.total = otp.interval
                 otpdata = TOTPData(otp, otp_name, otp_value, otp_progress)
                 self.otp_data[otp] = self.otp_data[i] = otpdata
-                
+
                 yield otp_value
                 yield otp_name
                 yield otp_progress
@@ -217,14 +239,25 @@ class TTOTP(App[None]):
 
         self.notify("Code copied", title="")
 
-@click.command
-@click.option("--config", type=pathlib.Path, default=default_conffile, help="Configuration file to use")
-@click.option("--profile", type=str, default=None, help="Profile to use within the configuration file")
-def main(config, profile):
 
+@click.command
+@click.option(
+    "--config",
+    type=pathlib.Path,
+    default=default_conffile,
+    help="Configuration file to use",
+)
+@click.option(
+    "--profile",
+    type=str,
+    default=None,
+    help="Profile to use within the configuration file",
+)
+def main(config, profile):
     def config_hint():
         config.parent.mkdir(parents=True, exist_ok=True)
-        print(f"""\
+        print(
+            f"""\
 You need to create the configuration file: {config}
 
 It's a toml file which specifies a command to run to retrieve the list of OTPs.
@@ -238,7 +271,8 @@ You can have multiple profiles as configuration file sections:
     [work]
     otp-command = ['pass', 'totp-tokens-work']
 
-""")
+"""
+        )
         raise SystemExit(2)
 
     if not config.exists():
@@ -252,21 +286,24 @@ You can have multiple profiles as configuration file sections:
     if profile:
         config_data = config_data[profile]
 
-    otp_command = config_data.get('otp-command')
+    otp_command = config_data.get("otp-command")
     if otp_command is None:
         config_hint()
 
-    c = subprocess.check_output(otp_command, shell=isinstance(otp_command, str), text=True)
+    c = subprocess.check_output(
+        otp_command, shell=isinstance(otp_command, str), text=True
+    )
     print(f"{c=!r}")
 
     global tokens
     tokens = []
-    for row in c.strip().split('\n'):
+    for row in c.strip().split("\n"):
         if row.startswith("otpauth://"):
             print(f"parsing {row=!r}")
             tokens.append(parse_uri(row))
 
     TTOTP(tokens).run()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
