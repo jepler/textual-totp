@@ -27,9 +27,9 @@ If the command is a string, it is interpreted with the shell; otherwise, the lis
 
 # Using the app
 
-Once the app has started, it will show each available TOTP. The code will show as "******" until it is revealed.
+Once the app has started, it will show each available TOTP. The code will show as "\*\*\*\*\*\*" until it is revealed.
 To reveal a code, tab to the desired line and press "s".
-When the code expires, it will be replaced with "******" again.
+When the code expires, it will be replaced with "\*\*\*\*\*\*" again.
 
 You can also copy a code directly to the operating system's clipboard by pressing "c".
 The code will be cleared from the clipboard after 30 seconds.
