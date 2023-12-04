@@ -96,6 +96,8 @@ class TOTPLabel(Label, can_focus=True):
     BINDINGS = [
         Binding("c", "copy", "Copy code", show=True),
         Binding("s", "show", "Show code", show=True),
+        Binding("up", "focus_previous", show=False),
+        Binding("down", "focus_next", show=False),
     ]
     
     @property
