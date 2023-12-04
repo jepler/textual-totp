@@ -12,23 +12,40 @@ import pathlib
 import subprocess
 from urllib.parse import parse_qsl, unquote, urlparse
 import re
+from typing import TYPE_CHECKING, Dict, Any, Sequence, cast
 
-from textual.app import App
+from textual.app import App, ComposeResult
+from textual.widget import Widget
 from textual.widgets import Label, Footer, ProgressBar
 from textual.binding import Binding
 from textual.containers import VerticalScroll
+from textual.css.query import DOMQuery
+from textual.timer import Timer
 
-import pyperclip
 import click
 import pyotp
 import platformdirs
 import tomllib
 
+# workaround for pyperclip being un-typed
+if TYPE_CHECKING:
+    def pyperclip_paste() -> str: ...
+    def pyperclip_copy(data: str) -> None: ...
+else:
+    from pyperclip import paste as pyperclip_paste
+    from pyperclip import copy as pyperclip_copy
 
-# Copied from pyotp with the issuer mismatch check removed
-def parse_uri(uri: str) -> pyotp.OTP:
+from typing import TypeGuard  # use `typing_extensions` for Python 3.9 and below
+
+def is_str_list(val: Any) -> TypeGuard[list[str]]:
+    """Determines whether all objects in the list are strings"""
+    if not isinstance(val, list): return False
+    return all(isinstance(x, str) for x in val)
+
+# Copied from pyotp with the issuer mismatch check removed and HTOP support removed
+def parse_uri(uri: str) -> pyotp.TOTP:
     """
-    Parses the provisioning URI for the OTP; works for either TOTP or HOTP.
+    Parses the provisioning URI for the TOTP
 
     See also:
         https://github.com/google/google-authenticator/wiki/Key-Uri-Format
@@ -92,8 +109,6 @@ def parse_uri(uri: str) -> pyotp.OTP:
     # Create objects
     if parsed_uri.netloc == "totp":
         return pyotp.TOTP(secret, **otp_data)
-    elif parsed_uri.netloc == "hotp":
-        return pyotp.HOTP(secret, **otp_data)
 
     raise ValueError("Not a supported OTP type")
 
@@ -110,33 +125,33 @@ class TOTPLabel(Label, can_focus=True):
     ]
 
     @property
-    def idx(self):
+    def idx(self) -> int:
         return int(self.css_class.split("-")[1])
 
     @property
-    def css_class(self):
+    def css_class(self) -> str:
         for c in self.classes:
             if re.match("otp-[0-9]", c):
                 return c
-        return None
+        raise RuntimeError("Class not found")
 
     @property
-    def related(self, arg=""):
+    def related(self, arg:str="") -> DOMQuery[Widget]:
         return self.screen.query(f".{self.css_class}{arg}")
 
-    def related_remove_class(self, cls):
+    def related_remove_class(self, cls: str) -> None:
         for widget in self.related:
             widget.remove_class(cls)
 
-    def related_add_class(self, cls):
+    def related_add_class(self, cls: str) -> None:
         for widget in self.related:
             widget.add_class(cls)
 
-    def on_blur(self):
+    def on_blur(self) -> None:
         self.related_remove_class("otp-focused")
         self.shown = False
 
-    def on_focus(self):
+    def on_focus(self) -> None:
         self.related_add_class("otp-focused")
 
 
@@ -148,8 +163,7 @@ class TOTPData:
     progress_widget: ProgressBar
     generation = None
 
-    def tick(self, now):
-        now = time.time()
+    def tick(self, now: float) -> None:
         generation, progress = divmod(now, self.totp.interval)
         if generation != self.generation:
             self.generation = generation
@@ -171,32 +185,32 @@ class TTOTP(App[None]):
     Bar { width: 1fr; }
     """
 
-    def __init__(self, tokens):
+    def __init__(self, tokens: Sequence[pyotp.TOTP]) -> None:
         super().__init__()
         self.tokens = tokens
-        self.otp_data = {}
-        self.timer = None
-        self.clear_clipboard_timer = None
-        self.copied = None
+        self.otp_data: Dict[int | pyotp.TOTP, TOTPData] = {}
+        self.timer: Timer | None = None
+        self.clear_clipboard_time: Timer | None = None
+        self.copied = ''
 
-    def on_mount(self):
+    def on_mount(self) -> None:
         self.timer_func()
         self.timer = self.set_interval(0.1, self.timer_func)
         self.clear_clipboard_timer = self.set_timer(
             30, self.clear_clipboard_func, pause=True
         )
 
-    def clear_clipboard_func(self):
-        if pyperclip.paste() == self.copied:
+    def clear_clipboard_func(self) -> None:
+        if pyperclip_paste() == self.copied:
             self.notify("Clipboard cleared", title="")
-            pyperclip.copy("")
+            pyperclip_copy("")
 
-    def timer_func(self):
+    def timer_func(self) -> None:
         now = time.time()
         for otp in self.otp_data.values():
             otp.tick(now)
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         yield Footer()
         with VerticalScroll() as v:
             v.can_focus = False
@@ -223,21 +237,23 @@ class TTOTP(App[None]):
                 yield otp_name
                 yield otp_progress
 
-    def action_show(self):
+    def action_show(self) -> None:
         widget = self.focused
-        otp = self.otp_data[widget.idx]
-        otp.value_widget.update(otp.totp.now())
+        if widget is not None:
+            otp = self.otp_data[cast(TOTPLabel, widget).idx]
+            otp.value_widget.update(otp.totp.now())
 
-    def action_copy(self):
+    def action_copy(self) -> None:
         widget = self.focused
-        otp = self.otp_data[widget.idx]
-        code = otp.totp.now()
-        pyperclip.copy(code)
-        self.copied = code
-        self.clear_clipboard_timer.reset()
-        self.clear_clipboard_timer.resume()
+        if widget is not None:
+            otp = self.otp_data[cast(TOTPLabel, widget).idx]
+            code = otp.totp.now()
+            pyperclip_copy(code)
+            self.copied = code
+            self.clear_clipboard_timer.reset()
+            self.clear_clipboard_timer.resume()
 
-        self.notify("Code copied", title="")
+            self.notify("Code copied", title="")
 
 
 @click.command
@@ -253,54 +269,60 @@ class TTOTP(App[None]):
     default=None,
     help="Profile to use within the configuration file",
 )
-def main(config, profile):
-    def config_hint():
+def main(config: pathlib.Path, profile: str) -> None:
+    def config_hint(extra: str) -> None:
         config.parent.mkdir(parents=True, exist_ok=True)
         print(
             f"""\
-You need to create the configuration file: {config}
+You need to create the configuration file:
+    {config}
 
 It's a toml file which specifies a command to run to retrieve the list of OTPs.
-One way to do this is with the `pass` program from https://www.passwordstore.org/
-(it keeps your secrets safe using GPG):
+One way to do this is with the `pass` program (https://www.passwordstore.org/)
+`pass` keeps your secrets safe using GPG. Typical contents:
 
     otp-command = ['pass', 'totp-tokens']
 
-You can have multiple profiles as configuration file sections:
+By default, the otp-command in the global section is used. You can have
+multiple profiles as configuration file sections, and select one with
+`ttotp --profile profile-name`:
 
     [work]
     otp-command = ['pass', 'totp-tokens-work']
 
-"""
+{extra}"""
         )
         raise SystemExit(2)
 
     if not config.exists():
-        config_hint()
+        config_hint(f"The configuration file {config} does not exist.")
 
     with open(config, "rb") as f:
         config_data = tomllib.load(f)
 
-    print(config_data)
-
     if profile:
-        config_data = config_data[profile]
+        config_data = config_data.get(profile, None)
+        if config_data is None:
+            config_hint(f"The profile {profile!r} file does not exist.")
 
     otp_command = config_data.get("otp-command")
     if otp_command is None:
-        config_hint()
+        config_hint("The otp-command value is missing.")
 
-    c = subprocess.check_output(
-        otp_command, shell=isinstance(otp_command, str), text=True
-    )
-    print(f"{c=!r}")
+    if isinstance(otp_command, str) or is_str_list(otp_command):
+        c = subprocess.check_output(
+            otp_command, shell=isinstance(otp_command, str), text=True
+        )
+    else:
+        config_hint("The otp-command value must be a string or list of strings.")
 
-    global tokens
-    tokens = []
+    tokens: list[pyotp.TOTP] = []
     for row in c.strip().split("\n"):
         if row.startswith("otpauth://"):
-            print(f"parsing {row=!r}")
             tokens.append(parse_uri(row))
+
+    if not tokens:
+        config_hint("No tokens were found when running the given command.")
 
     TTOTP(tokens).run()
 

@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2023 Jeff Epler
+#
+# SPDX-License-Identifier: MIT
+
+/venv
+*.egg-info/
+__version__.py
