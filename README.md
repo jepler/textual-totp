@@ -8,8 +8,8 @@ SPDX-License-Identifier: MIT
 
 # Installation
 
-Right now, you have to `pip install` the requirements and then run the program with
-`python ttotp.py`
+Right now you have to pick this up from github, it's not yet on pypi:
+`pipx install https://github.com/jepler/textual-totp@main`
 
 # Configuration
 
