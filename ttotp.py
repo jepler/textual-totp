@@ -147,12 +147,15 @@ class TOTPData:
 class TTOTP(App[None]):
 
     CSS = '''
-    VerticalScroll { layout: grid; grid-size: 2;
+    VerticalScroll {
+        layout: grid;
+        grid-size: 2;
         grid-columns: 8 1fr;
         grid-rows: 1;
     }
     .otp-focused { background: $primary-background; }
     ProgressBar { column-span: 2; }
+    Bar > .bar--bar { color: $success; }
     Bar { width: 1fr; }
     '''
 
@@ -181,8 +184,8 @@ class TTOTP(App[None]):
 
     def compose(self):
         yield Footer()
-        with VerticalScroll():
-
+        with VerticalScroll() as v:
+            v.can_focus = False
             for i, otp in enumerate(self.tokens):
                 otp_name = TOTPLabel(f"{otp.name} / {otp.issuer}", classes=f"otp-name otp-name-{i} otp-{i}", expand=True)
                 otp_value = Label("", classes=f"otp-value otp-value-{i} otp-{i}", expand=True)
@@ -250,7 +253,6 @@ One way to do this is with the `pass` program from https://www.passwordstore.org
         if row.startswith("otpauth://"):
             print(f"parsing {row=!r}")
             tokens.append(parse_uri(row))
-
 
     TTOTP(tokens).run()
 
