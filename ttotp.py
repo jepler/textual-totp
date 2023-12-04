@@ -152,7 +152,7 @@ class TTOTP(App[None]):
     VerticalScroll {
         layout: grid;
         grid-size: 2;
-        grid-columns: 8 1fr;
+        grid-columns: 9 1fr;
         grid-rows: 1;
     }
     .otp-focused { background: $primary-background; }
