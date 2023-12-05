@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Dict, Any, Sequence, cast
 
 from textual.app import App, ComposeResult
 from textual.widget import Widget
-from textual.widgets import Label, Footer, ProgressBar
+from textual.widgets import Label, Footer, ProgressBar, Button
 from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.css.query import DOMQuery
@@ -126,7 +126,7 @@ class TOTPLabel(Label, can_focus=True):
         Binding("down", "focus_next", show=False),
     ]
 
-    def __init__(self, otp: TOTPData) -> None:
+    def __init__(self, otp: "TOTPData") -> None:
         self.otp = otp
         super().__init__(
             f"{otp.totp.name} / {otp.totp.issuer}",
@@ -152,14 +152,10 @@ class TOTPLabel(Label, can_focus=True):
         for widget in self.related:
             widget.add_class(cls)
 
-    def on_blur(self) -> None:
-        self.related_remove_class("otp-focused")
-        self.otp.value_widget.update("*" * self.otp.totp.digits)
-        self.shown = False
-
-    def on_focus(self) -> None:
-        self.related_add_class("otp-focused")
-
+class TOTPButton(Button, can_focus=False):
+    def __init__(self, otp: "OTPData", label: str, classes: str):
+        self.otp = otp
+        super().__init__(label=label, classes=classes)
 
 @dataclass
 class TOTPData:
@@ -168,6 +164,8 @@ class TOTPData:
     name_widget: Label = field(init=False)
     value_widget: Label = field(init=False)
     progress_widget: ProgressBar = field(init=False)
+    copy_widget: TOTPButton = field(init=False)
+    show_widget: TOTPButton = field(init=False)
 
     @property
     def id(self) -> int:
@@ -175,7 +173,10 @@ class TOTPData:
 
     def __post_init__(self) -> None:
         self.name_widget = TOTPLabel(self)
-
+        self.copy_widget = TOTPButton(self, "🗐 ",
+            classes=f"otp-copy otp-copy-{self.id} otp-{self.id}")
+        self.show_widget = TOTPButton(self, "👀",
+            classes=f"otp-show otp-show-{self.id} otp-{self.id}")
         self.value_widget = Label(
             "*" * self.totp.digits,
             classes=f"otp-value otp-value-{self.id} otp-{self.id}",
@@ -197,21 +198,22 @@ class TOTPData:
 
     @property
     def widgets(self) -> Sequence[Widget]:
-        return self.value_widget, self.name_widget, self.progress_widget
+        return self.value_widget, self.name_widget, self.copy_widget, self.show_widget, self.progress_widget
 
 
 class TTOTP(App[None]):
     CSS = """
     VerticalScroll {
         layout: grid;
-        grid-size: 2;
-        grid-columns: 9 1fr;
+        grid-size: 5;
         grid-rows: 1;
+        grid-columns: 9 1fr 6 6;
     }
-    .otp-focused { background: $primary-background; }
-    ProgressBar { column-span: 2; }
+    TOTPLabel:focus { background: $primary-background; }
     Bar > .bar--bar { color: $success; }
     Bar { width: 1fr; }
+    Button { border: none; height: 1; width: 3; min-width: 4 }
+
     """
 
     def __init__(self, tokens: Sequence[pyotp.TOTP]) -> None:
@@ -265,6 +267,14 @@ class TTOTP(App[None]):
             self.clear_clipboard_timer.resume()
 
             self.notify("Code copied", title="")
+
+    def on_button_pressed(self, event):
+        button = event.button
+        self.screen.set_focus(button.otp.name_widget)
+        if 'otp-show' in button.classes:
+            self.action_show()
+        else:
+            self.action_copy()
 
 
 @click.command
