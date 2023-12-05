@@ -249,7 +249,7 @@ class TTOTP(App[None]):
 
     def on_mount(self) -> None:
         self.timer_func()
-        self.timer = self.set_interval(0.1, self.timer_func)
+        self.timer = self.set_interval(1, self.timer_func)
         self.clear_clipboard_timer = self.set_timer(
             30, self.clear_clipboard_func, pause=True
         )
