@@ -18,7 +18,7 @@ from textual.app import App, ComposeResult
 from textual.widget import Widget
 from textual.widgets import Label, Footer, ProgressBar, Button
 from textual.binding import Binding
-from textual.containers import VerticalScroll
+from textual.containers import VerticalScroll, Horizontal
 from textual.css.query import DOMQuery
 from textual.timer import Timer
 
@@ -131,6 +131,8 @@ class TOTPLabel(Label, can_focus=True):
         Binding("s", "show", "Show code", show=True),
         Binding("up", "focus_previous", show=False),
         Binding("down", "focus_next", show=False),
+        Binding("k", "focus_previous", show=False),
+        Binding("j", "focus_next", show=False),
     ]
 
     def __init__(self, otp: "TOTPData") -> None:
@@ -159,6 +161,11 @@ class TOTPLabel(Label, can_focus=True):
     def related_add_class(self, cls: str) -> None:
         for widget in self.related:
             widget.add_class(cls)
+
+    def on_blur(self) -> None:
+        self.related_remove_class("otp-focused")
+        self.otp.value_widget.update("*" * self.otp.totp.digits)
+        self.shown = False
 
 
 class TOTPButton(Button, can_focus=False):
@@ -213,25 +220,23 @@ class TOTPData:
         return (
             self.value_widget,
             self.name_widget,
-            self.copy_widget,
-            self.show_widget,
             self.progress_widget,
+            self.show_widget,
+            self.copy_widget,
         )
 
 
 class TTOTP(App[None]):
     CSS = """
-    VerticalScroll {
-        layout: grid;
-        grid-size: 5;
-        grid-rows: 1;
-        grid-columns: 9 1fr 6 6;
-    }
-    TOTPLabel:focus { background: $primary-background; }
+    VerticalScroll { min-height: 1; }
+    .otp-progress { width: 12; }
+    .otp-value { width: 9; }
+    TOTPLabel { width: 1fr; }
+    Horizontal:focus-within { background: $primary-background; }
     Bar > .bar--bar { color: $success; }
     Bar { width: 1fr; }
     Button { border: none; height: 1; width: 3; min-width: 4 }
-
+    Horizontal { height: 1; }
     """
 
     def __init__(self, tokens: Sequence[pyotp.TOTP]) -> None:
@@ -266,7 +271,8 @@ class TTOTP(App[None]):
             for otp in self.tokens:
                 data = TOTPData(otp)
                 self.otp_data.append(data)
-                yield from data.widgets
+                with Horizontal():
+                    yield from data.widgets
 
     def action_show(self) -> None:
         widget = self.focused
