@@ -110,7 +110,7 @@ def parse_uri(uri: str) -> pyotp.TOTP:
     if parsed_uri.netloc == "totp":
         return pyotp.TOTP(secret, **otp_data)
 
-    raise ValueError("Not a supported OTP type")
+    raise ValueError(f"Not a supported OTP type: {parsed_uri.netloc}")
 
 
 default_conffile = platformdirs.user_config_path("ttotp") / "settings.toml"
