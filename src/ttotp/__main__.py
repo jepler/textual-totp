@@ -12,7 +12,7 @@ import pathlib
 import subprocess
 from urllib.parse import parse_qsl, unquote, urlparse
 import re
-from typing import TYPE_CHECKING, Dict, Any, Sequence, cast
+from typing import TYPE_CHECKING, Any, Sequence, cast
 
 from textual.app import App, ComposeResult
 from textual.widget import Widget
@@ -29,18 +29,25 @@ import tomllib
 
 # workaround for pyperclip being un-typed
 if TYPE_CHECKING:
-    def pyperclip_paste() -> str: ...
-    def pyperclip_copy(data: str) -> None: ...
+
+    def pyperclip_paste() -> str:
+        ...
+
+    def pyperclip_copy(data: str) -> None:
+        ...
 else:
     from pyperclip import paste as pyperclip_paste
     from pyperclip import copy as pyperclip_copy
 
 from typing import TypeGuard  # use `typing_extensions` for Python 3.9 and below
 
+
 def is_str_list(val: Any) -> TypeGuard[list[str]]:
     """Determines whether all objects in the list are strings"""
-    if not isinstance(val, list): return False
+    if not isinstance(val, list):
+        return False
     return all(isinstance(x, str) for x in val)
+
 
 # Copied from pyotp with the issuer mismatch check removed and HTOP support removed
 def parse_uri(uri: str) -> pyotp.TOTP:
@@ -58,7 +65,7 @@ def parse_uri(uri: str) -> pyotp.TOTP:
     secret = None
 
     # Data we'll parse to the correct constructor
-    otp_data = {}  # type: Dict[str, Any]
+    otp_data: dict[str, Any] = {}
 
     # Parse with URLlib
     parsed_uri = urlparse(unquote(uri))
@@ -131,7 +138,8 @@ class TOTPLabel(Label, can_focus=True):
         super().__init__(
             f"{otp.totp.name} / {otp.totp.issuer}",
             classes=f"otp-name otp-name-{otp.id} otp-{otp.id}",
-            expand=True)
+            expand=True,
+        )
 
     @property
     def css_class(self) -> str:
@@ -141,7 +149,7 @@ class TOTPLabel(Label, can_focus=True):
         raise RuntimeError("Class not found")
 
     @property
-    def related(self, arg:str="") -> DOMQuery[Widget]:
+    def related(self, arg: str = "") -> DOMQuery[Widget]:
         return self.screen.query(f".{self.css_class}{arg}")
 
     def related_remove_class(self, cls: str) -> None:
@@ -152,10 +160,12 @@ class TOTPLabel(Label, can_focus=True):
         for widget in self.related:
             widget.add_class(cls)
 
+
 class TOTPButton(Button, can_focus=False):
-    def __init__(self, otp: "OTPData", label: str, classes: str):
+    def __init__(self, otp: "TOTPData", label: str, classes: str):
         self.otp = otp
         super().__init__(label=label, classes=classes)
+
 
 @dataclass
 class TOTPData:
@@ -173,14 +183,16 @@ class TOTPData:
 
     def __post_init__(self) -> None:
         self.name_widget = TOTPLabel(self)
-        self.copy_widget = TOTPButton(self, "🗐 ",
-            classes=f"otp-copy otp-copy-{self.id} otp-{self.id}")
-        self.show_widget = TOTPButton(self, "👀",
-            classes=f"otp-show otp-show-{self.id} otp-{self.id}")
+        self.copy_widget = TOTPButton(
+            self, "🗐 ", classes=f"otp-copy otp-copy-{self.id} otp-{self.id}"
+        )
+        self.show_widget = TOTPButton(
+            self, "👀", classes=f"otp-show otp-show-{self.id} otp-{self.id}"
+        )
         self.value_widget = Label(
             "*" * self.totp.digits,
             classes=f"otp-value otp-value-{self.id} otp-{self.id}",
-            expand=True
+            expand=True,
         )
         self.progress_widget = ProgressBar(
             classes=f"otp-progress otp-progress-{self.id} otp-{self.id}",
@@ -198,7 +210,13 @@ class TOTPData:
 
     @property
     def widgets(self) -> Sequence[Widget]:
-        return self.value_widget, self.name_widget, self.copy_widget, self.show_widget, self.progress_widget
+        return (
+            self.value_widget,
+            self.name_widget,
+            self.copy_widget,
+            self.show_widget,
+            self.progress_widget,
+        )
 
 
 class TTOTP(App[None]):
@@ -222,7 +240,7 @@ class TTOTP(App[None]):
         self.otp_data: list[TOTPData] = []
         self.timer: Timer | None = None
         self.clear_clipboard_time: Timer | None = None
-        self.copied = ''
+        self.copied = ""
 
     def on_mount(self) -> None:
         self.timer_func()
@@ -268,10 +286,10 @@ class TTOTP(App[None]):
 
             self.notify("Code copied", title="")
 
-    def on_button_pressed(self, event):
-        button = event.button
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        button = cast(TOTPButton, event.button)
         self.screen.set_focus(button.otp.name_widget)
-        if 'otp-show' in button.classes:
+        if "otp-show" in button.classes:
             self.action_show()
         else:
             self.action_copy()
