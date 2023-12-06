@@ -9,7 +9,7 @@ mypy: venv/bin/mypy
 # Update CONTRIBUTING.md if these commands change
 venv/bin/mypy:
 	python -mvenv venv
-	venv/bin/pip install -r requirements.txt 'mypy!=1.7.0'
+	venv/bin/pip install -r requirements-dev.txt
 
 .PHONY: clean
 clean:
