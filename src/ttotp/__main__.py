@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Sequence, cast
 
 from textual.app import App, ComposeResult
 from textual.widget import Widget
-from textual.widgets import Label, Footer, ProgressBar, Button
+from textual.widgets import Label, Footer, ProgressBar, Button, Input
 from textual.binding import Binding
 from textual.containers import VerticalScroll, Horizontal
 from textual.css.query import DOMQuery
@@ -138,7 +138,7 @@ class TOTPLabel(Label, can_focus=True):
     def __init__(self, otp: "TOTPData") -> None:
         self.otp = otp
         super().__init__(
-            f"{otp.totp.name} / {otp.totp.issuer}",
+            otp.name,
             classes=f"otp-name otp-name-{otp.id} otp-{otp.id}",
             expand=True,
         )
@@ -168,6 +168,21 @@ class TOTPLabel(Label, can_focus=True):
         self.shown = False
 
 
+class SearchInput(Input, can_focus=False):
+    BINDINGS = [
+        Binding("up", "focus_previous", show=False),
+        Binding("down", "focus_next", show=False),
+        Binding("ctrl+a", "clear_search", "Show all", show=True),
+    ]
+
+    def on_focus(self):
+        self.placeholder = "Enter regular expression"
+
+    def on_blur(self):
+        self.placeholder = "Type / to search"
+        self.can_focus = False
+
+
 class TOTPButton(Button, can_focus=False):
     def __init__(self, otp: "TOTPData", label: str, classes: str):
         self.otp = otp
@@ -178,6 +193,7 @@ class TOTPButton(Button, can_focus=False):
 class TOTPData:
     totp: pyotp.TOTP
     generation = None
+    name: str = field(init=False)
     name_widget: Label = field(init=False)
     value_widget: Label = field(init=False)
     progress_widget: ProgressBar = field(init=False)
@@ -189,6 +205,7 @@ class TOTPData:
         return id(self)
 
     def __post_init__(self) -> None:
+        self.name = f"{self.totp.name} / {self.totp.issuer}"
         self.name_widget = TOTPLabel(self)
         self.copy_widget = TOTPButton(
             self, "🗐 ", classes=f"otp-copy otp-copy-{self.id} otp-{self.id}"
@@ -231,13 +248,20 @@ class TTOTP(App[None]):
     VerticalScroll { min-height: 1; }
     .otp-progress { width: 12; }
     .otp-value { width: 9; }
+    .otp-hidden { display: none; }
     TOTPLabel { width: 1fr; }
     Horizontal:focus-within { background: $primary-background; }
     Bar > .bar--bar { color: $success; }
     Bar { width: 1fr; }
     Button { border: none; height: 1; width: 3; min-width: 4 }
     Horizontal { height: 1; }
+    Input { border: none; height: 1; width: 1fr; }
     """
+
+    BINDINGS = [
+        Binding("/", "search"),
+        Binding("ctrl+a", "clear_search", "Show all", show=True),
+    ]
 
     def __init__(self, tokens: Sequence[pyotp.TOTP]) -> None:
         super().__init__()
@@ -273,6 +297,7 @@ class TTOTP(App[None]):
                 self.otp_data.append(data)
                 with Horizontal():
                     yield from data.widgets
+        yield SearchInput(id="search", placeholder="Type / to search")
 
     def action_show(self) -> None:
         widget = self.focused
@@ -299,6 +324,30 @@ class TTOTP(App[None]):
             self.action_show()
         else:
             self.action_copy()
+
+    @property
+    def search(self) -> Input:
+        return self.query_one(Input)
+
+    def action_search(self) -> None:
+        self.search.can_focus = True
+        self.search.focus()
+
+    def action_clear_search(self) -> None:
+        self.search.clear()
+        if self.focused is self.search:
+            self.screen.focus_next()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        rx = re.compile(event.value or ".", re.I)
+        for otp in self.otp_data:
+            if rx.search(otp.name):
+                otp.name_widget.parent.remove_class("otp-hidden")
+            else:
+                otp.name_widget.parent.add_class("otp-hidden")
+
+    def on_input_submitted(self, event: Input.Changed) -> None:
+        self.screen.focus_next()
 
 
 @click.command
