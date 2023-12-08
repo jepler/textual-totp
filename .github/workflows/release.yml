@@ -12,8 +12,6 @@ jobs:
   release:
 
     runs-on: ubuntu-22.04
-    # Specifying a GitHub environment is optional, but strongly encouraged
-    environment: release
     permissions:
       # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
@@ -39,7 +37,6 @@ jobs:
       run: python -mbuild
 
     - name: Upload release
-      run: twine upload -u "$TWINE_USERNAME" -p "$TWINE_PASSWORD" dist/*
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: dist/
