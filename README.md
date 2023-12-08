@@ -35,6 +35,20 @@ otp-command = "echo 'otpauth://totp/example?algorithm=SHA1&digits=6&secret=IHACD
 
 If the command is a string, it is interpreted with the shell; otherwise, the list of arguments is used directly.
 
+# Obtaining TOTP URIs
+
+There are a couple of ways to obtain your TOTP URIs, which are strings that begin `otpauth://totp/`.
+
+ * Scan individual QR codes when signing up for 2FA
+   * You can photograph or screen capture and then locally decode QR codes using a compatible tool such as [PyQRCode](https://pypi.org/project/PyQRCode/)
+ * Scan the QR code(s) from Google Authenticator's "transfer accounts" feature. These are in the form of an "offline otpauth-migration" URL. Decode these with a compatible tool, such as [otpauth-migration-decode](https://github.com/trewlgns/otpauth-migration-decode)
+   * Android does not permit this from being screenshotted, but your laptop probably has a camera
+ * Transcribe the lengthy alphanumeric code that is shown during some 2FA signup processes into a complete otpauth URL, removing any whitespace that is present.
+
+There are browser-based tools for helping with some of these tasks.
+However, it is difficult to determine whether web pages treat data safely.
+Therefore, none are recommended in this section.
+
 # Using textual-totp
 
 The command to start textual-totp is `ttotp`.
@@ -71,3 +85,20 @@ As long as `ttotp` is open, the TOTP secret values are stored in memory in plain
 
 `ttotp` never writes secret values to operating system files or stores them in environment variables.
 (but your otp-command might! check any related documentation carefully)
+
+# Development Status
+
+I (@jepler) wrote this software because it was useful to me. It fits my needs
+in its current form. I maintain it for my own needs and acting on issues and
+pull requests is unlikely to be a high priority. Thank you for your understanding about this!
+
+I develop the software on Linux, generally Debian Linux. I often make
+compatibility with Debian Oldstable my goal, but this package has only been
+tested on stable Debian Bookworm with Python 3.11 and almost certainly uses
+constructs not in Python 3.9. Improvements for compatibility on other platforms
+are welcome.
+
+In the unlikely event that this project becomes popular, I would want to
+convert it to a community-run project with multiple maintainers. There are some
+issues in the tracker entered by me that seem like good directions to develop
+the software in.
