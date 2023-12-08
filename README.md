@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # textual-totp: TOTP (authenticator) application using Python & Textual
 
+![ttotp in action](https://github.com/jepler/textual-totp/blob/main/ttotp.png)
+
 # Installation
 
 Right now you have to pick this up from github, it's not yet on pypi:
