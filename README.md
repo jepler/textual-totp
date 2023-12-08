@@ -10,8 +10,10 @@ SPDX-License-Identifier: MIT
 
 # Installation
 
-Right now you have to pick this up from github, it's not yet on pypi:
-`pipx install https://github.com/jepler/textual-totp@main`
+You can install textual-totp with pip or pipx:
+```
+pipx install textual-totp
+```
 
 # Configuration
 

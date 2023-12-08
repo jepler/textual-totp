@@ -175,10 +175,10 @@ class SearchInput(Input, can_focus=False):
         Binding("ctrl+a", "clear_search", "Show all", show=True),
     ]
 
-    def on_focus(self):
+    def on_focus(self) -> None:
         self.placeholder = "Enter regular expression"
 
-    def on_blur(self):
+    def on_blur(self) -> None:
         self.placeholder = "Type / to search"
         self.can_focus = False
 
@@ -341,10 +341,12 @@ class TTOTP(App[None]):
     def on_input_changed(self, event: Input.Changed) -> None:
         rx = re.compile(event.value or ".", re.I)
         for otp in self.otp_data:
+            parent = otp.name_widget.parent
+            assert parent is not None
             if rx.search(otp.name):
-                otp.name_widget.parent.remove_class("otp-hidden")
+                parent.remove_class("otp-hidden")
             else:
-                otp.name_widget.parent.add_class("otp-hidden")
+                parent.add_class("otp-hidden")
 
     def on_input_submitted(self, event: Input.Changed) -> None:
         self.screen.focus_next()
