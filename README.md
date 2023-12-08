@@ -61,6 +61,9 @@ Your Operating System may report that `ttotp` "pasted from the clipboard".
 This is because `ttotp` tries to only clear values that it set,
 by checking that the current clipboard value is equal to the value it pasted earlier.
 
+Search for a key by pressing "/" and then entering a case insensitive regular expression.
+Press Ctrl+A to show all keys again.
+
 Exit the app with Ctrl+C.
 
 # In-memory storage of TOTPs
