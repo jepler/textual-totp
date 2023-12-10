@@ -176,11 +176,12 @@ class SearchInput(Input, can_focus=False):
     ]
 
     def on_focus(self) -> None:
-        self.placeholder = "Enter regular expression"
+        self.placeholder = "Enter search expression"
 
     def on_blur(self) -> None:
         self.placeholder = "Type / to search"
         self.can_focus = False
+        self.remove_class("error")
 
 
 class TOTPButton(Button, can_focus=False):
@@ -243,6 +244,18 @@ class TOTPData:
         )
 
 
+def search_preprocess(s):
+    def replace_escape_sequence(m):
+        s = m.group(0)
+        if s == "\\ ":
+            return " "
+        if s == " ":
+            return r".*\s+.*"
+        return s
+
+    return re.sub(r"\\.| |[^\\ ]+", replace_escape_sequence, s)
+
+
 class TTOTP(App[None]):
     CSS = """
     VerticalScroll { min-height: 1; }
@@ -256,6 +269,7 @@ class TTOTP(App[None]):
     Button { border: none; height: 1; width: 3; min-width: 4 }
     Horizontal { height: 1; }
     Input { border: none; height: 1; width: 1fr; }
+    Input.error { background: $error; }
     """
 
     BINDINGS = [
@@ -339,7 +353,13 @@ class TTOTP(App[None]):
             self.screen.focus_next()
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        rx = re.compile(event.value or ".", re.I)
+        haystack = event.value.replace(" ", ".* .*")
+        try:
+            rx = re.compile(haystack, re.I)
+        except re.error:
+            self.search.add_class("error")
+            return
+        self.search.remove_class("error")
         for otp in self.otp_data:
             parent = otp.name_widget.parent
             assert parent is not None
