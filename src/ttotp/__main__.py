@@ -244,8 +244,8 @@ class TOTPData:
         )
 
 
-def search_preprocess(s):
-    def replace_escape_sequence(m):
+def search_preprocess(s: str) -> str:
+    def replace_escape_sequence(m: re.Match[str]) -> str:
         s = m.group(0)
         if s == "\\ ":
             return " "

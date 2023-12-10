@@ -32,3 +32,10 @@ repos:
       args: [ --fix, --preview ]
     # Run the formatter.
     - id: ruff-format
+- repo: local
+  hooks:
+    - id: mypy
+      name: Run the mypy type linter
+      language: system
+      types: [python]
+      entry: 'make mypy'
