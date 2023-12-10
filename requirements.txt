@@ -2,8 +2,8 @@
 #
 # SPDX-License-Identifier: MIT
 
-textual
-pyperclip
-pyotp
 click
 platformdirs
+pyotp
+pyperclip
+textual
