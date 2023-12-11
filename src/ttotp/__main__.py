@@ -14,6 +14,7 @@ from urllib.parse import parse_qsl, unquote, urlparse
 import re
 from typing import TYPE_CHECKING, Any, Sequence, cast
 
+import rich.text
 from textual.app import App, ComposeResult
 from textual.widget import Widget
 from textual.widgets import Label, Footer, ProgressBar, Button, Input
@@ -138,7 +139,7 @@ class TOTPLabel(Label, can_focus=True):
     def __init__(self, otp: "TOTPData") -> None:
         self.otp = otp
         super().__init__(
-            otp.name,
+            rich.text.Text(otp.name, overflow="ellipsis", no_wrap=True),
             classes=f"otp-name otp-name-{otp.id} otp-{otp.id}",
             expand=True,
         )
@@ -262,7 +263,7 @@ class TTOTP(App[None]):
     .otp-progress { width: 12; }
     .otp-value { width: 9; }
     .otp-hidden { display: none; }
-    TOTPLabel { width: 1fr; }
+    TOTPLabel { width: 1fr; height: 1; padding: 0 1; }
     Horizontal:focus-within { background: $primary-background; }
     Bar > .bar--bar { color: $success; }
     Bar { width: 1fr; }
