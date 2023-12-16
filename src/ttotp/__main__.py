@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, Sequence, cast
 import rich.text
 from textual.fuzzy import Matcher
 from textual.app import App, ComposeResult
+from textual.events import Key, MouseDown, MouseUp, MouseScrollDown, MouseScrollUp
 from textual.widget import Widget
 from textual.widgets import Label, Footer, ProgressBar, Button, Input
 from textual.binding import Binding
@@ -279,12 +280,17 @@ class TTOTP(App[None]):
         Binding("ctrl+a", "clear_search", "Show all", show=True),
     ]
 
-    def __init__(self, tokens: Sequence[pyotp.TOTP]) -> None:
+    def __init__(
+        self, tokens: Sequence[pyotp.TOTP], timeout: int | float | None
+    ) -> None:
         super().__init__()
         self.tokens = tokens
         self.otp_data: list[TOTPData] = []
         self.timer: Timer | None = None
         self.clear_clipboard_time: Timer | None = None
+        self.exit_time: Timer | None = None
+        self.warn_exit_time: Timer | None = None
+        self.timeout: int | float | None = timeout
         self.copied = ""
 
     def on_mount(self) -> None:
@@ -293,6 +299,24 @@ class TTOTP(App[None]):
         self.clear_clipboard_timer = self.set_timer(
             30, self.clear_clipboard_func, pause=True
         )
+        if self.timeout:
+            self.exit_time = self.set_timer(self.timeout, self.action_quit)
+            warn_timeout = max(self.timeout / 2, self.timeout - 10)
+            self.warn_exit_time = self.set_timer(warn_timeout, self.warn_quit)
+
+    def reset_exit_timers(self) -> None:
+        if self.exit_time:
+            self.exit_time.reset()
+        if self.warn_exit_time:
+            self.warn_exit_time.reset()
+
+    async def on_event(self, event: Any) -> None:
+        if isinstance(event, (Key, MouseDown, MouseUp, MouseScrollDown, MouseScrollUp)):
+            self.reset_exit_timers()
+        await super().on_event(event)
+
+    def warn_quit(self) -> None:
+        self.notify("Will exit soon due to inactivity", title="Auto-exit")
 
     def clear_clipboard_func(self) -> None:
         if pyperclip_paste() == self.copied:
@@ -432,9 +456,10 @@ multiple profiles as configuration file sections, and select one with
         config_data = tomllib.load(f)
 
     if profile:
-        config_data = config_data.get(profile, None)
-        if config_data is None:
+        profile_data = config_data.get(profile, None)
+        if profile_data is None:
             config_hint(f"The profile {profile!r} file does not exist.")
+        config_data.update(profile_data)
 
     otp_command = config_data.get("otp-command")
     if otp_command is None:
@@ -447,6 +472,11 @@ multiple profiles as configuration file sections, and select one with
     else:
         config_hint("The otp-command value must be a string or list of strings.")
 
+    timeout = config_data.get("auto-exit", None)
+    if timeout is not None:
+        if not isinstance(timeout, (float, int)):
+            config_hint("If specified, the auto-exit value must be a number.")
+
     tokens: list[pyotp.TOTP] = []
     for row in c.strip().split("\n"):
         if row.startswith("otpauth://"):
@@ -455,7 +485,7 @@ multiple profiles as configuration file sections, and select one with
     if not tokens:
         config_hint("No tokens were found when running the given command.")
 
-    TTOTP(tokens).run()
+    TTOTP(tokens, timeout).run()
 
 
 if __name__ == "__main__":
