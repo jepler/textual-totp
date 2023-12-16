@@ -75,10 +75,10 @@ Your Operating System may report that `ttotp` "pasted from the clipboard".
 This is because `ttotp` tries to only clear values that it set,
 by checking that the current clipboard value is equal to the value it pasted earlier.
 
-Search for a key by pressing "/" and then entering a modified case insensitive regular expression.
+Search for a key by pressing "/" and then entering sub-strings to search for.
 Press Ctrl+A to show all keys again.
 
-In this type of regular expression, a space ` ` stands for "zero or more characters, followed by whitespace, followed by zero or more characters"; the sequence backslash-space stands for a literal space.
+Textual's built in [fuzzy match](https://textual.textualize.io/api/fuzzy_matcher/) algorithm is used.
 
 This makes it easy to search for e.g., "Jay Doe / example.com" by entering "ja d ex", while not requiring any sophisticated fuzzy search technology.
 
