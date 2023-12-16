@@ -15,6 +15,7 @@ import re
 from typing import TYPE_CHECKING, Any, Sequence, cast
 
 import rich.text
+from textual.fuzzy import Matcher
 from textual.app import App, ComposeResult
 from textual.widget import Widget
 from textual.widgets import Label, Footer, ProgressBar, Button, Input
@@ -354,20 +355,33 @@ class TTOTP(App[None]):
             self.screen.focus_next()
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        haystack = event.value.replace(" ", ".* .*")
-        try:
-            rx = re.compile(haystack, re.I)
-        except re.error:
-            self.search.add_class("error")
-            return
-        self.search.remove_class("error")
-        for otp in self.otp_data:
-            parent = otp.name_widget.parent
-            assert parent is not None
-            if rx.search(otp.name):
-                parent.remove_class("otp-hidden")
-            else:
-                parent.add_class("otp-hidden")
+        with self.batch_update():
+            needle = event.value
+            if not needle:
+                for otp in self.otp_data:
+                    name_widget = otp.name_widget
+                    parent = name_widget.parent
+                    assert parent is not None
+                    parent.remove_class("otp-hidden")
+                    name_widget.update(
+                        rich.text.Text(otp.name, overflow="ellipsis", no_wrap=True)
+                    )
+                return
+
+            matcher = Matcher(needle)
+            for otp in self.otp_data:
+                name_widget = otp.name_widget
+                parent = name_widget.parent
+                assert parent is not None
+                score = matcher.match(otp.name)
+                if score > 0:
+                    highlighted = matcher.highlight(otp.name)
+                    highlighted.overflow = "ellipsis"
+                    highlighted.no_wrap = True
+                    name_widget.update(highlighted)
+                    parent.remove_class("otp-hidden")
+                else:
+                    parent.add_class("otp-hidden")
 
     def on_input_submitted(self, event: Input.Changed) -> None:
         self.screen.focus_next()
