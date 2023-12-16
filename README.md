@@ -35,6 +35,30 @@ otp-command = "echo 'otpauth://totp/example?algorithm=SHA1&digits=6&secret=IHACD
 
 If the command is a string, it is interpreted with the shell; otherwise, the list of arguments is used directly.
 
+## Auto-exit on idle
+
+To auto exit after a specified inactivity period, use the `auto-exit` setting:
+```toml
+# Exit after 5 minutes (300 seconds) of inactivity
+auto-exit = 300
+```
+Any key event, mouse click, or mouse scroll counts as "activity" and will reset the auto exit timer.
+
+If `auto-exit` is not specified, or it is 0, there is no inactivity timeout.
+
+## Profiles
+
+textual-totp supports multiple profiles. Profiles are organized as sections of the configuration file; if a setting is not specified within a profile section, the global setting is used.
+
+For example, given
+```
+auto-exit=300
+otp-command = ["..."]
+[trusted-location]
+auto-exit=0
+```
+textual-totp will normally exit after 5 minutes of inactivity, but when you run `ttotp --profile trusted-location` auto-exit will be disabled.
+
 # Obtaining TOTP URIs
 
 There are a couple of ways to obtain your TOTP URIs, which are strings that begin `otpauth://totp/`.
