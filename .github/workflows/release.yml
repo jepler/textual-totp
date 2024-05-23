@@ -12,6 +12,7 @@ jobs:
   release:
 
     runs-on: ubuntu-22.04
+    environment: release
     permissions:
       # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write

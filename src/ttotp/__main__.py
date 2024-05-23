@@ -30,6 +30,10 @@ import pyotp
 import platformdirs
 import tomllib
 
+from textual._ansi_sequences import ANSI_SEQUENCES_KEYS
+from textual.keys import Keys
+from typing import TypeGuard  # use `typing_extensions` for Python 3.9 and below
+
 # workaround for pyperclip being un-typed
 if TYPE_CHECKING:
 
@@ -42,14 +46,18 @@ else:
     from pyperclip import paste as pyperclip_paste
     from pyperclip import copy as pyperclip_copy
 
-from typing import TypeGuard  # use `typing_extensions` for Python 3.9 and below
-
 
 def is_str_list(val: Any) -> TypeGuard[list[str]]:
     """Determines whether all objects in the list are strings"""
     if not isinstance(val, list):
         return False
     return all(isinstance(x, str) for x in val)
+
+
+# Monkeypatch escape key as meaning "F9", WFM
+# ignore typing here because ANSI_SEQUENCES_KEYS is a Mapping[] which is read-only as
+# far as mypy is concerned.
+ANSI_SEQUENCES_KEYS["\x1b\x1b"] = (Keys.F9,)  # type: ignore
 
 
 # Copied from pyotp with the issuer mismatch check removed and HTOP support removed
@@ -176,6 +184,7 @@ class SearchInput(Input, can_focus=False):
         Binding("up", "focus_previous", show=False),
         Binding("down", "focus_next", show=False),
         Binding("ctrl+a", "clear_search", "Show all", show=True),
+        Binding("F9", "clear_search", show=True),
     ]
 
     def on_focus(self) -> None:
