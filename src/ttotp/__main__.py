@@ -149,7 +149,7 @@ class TOTPLabel(Label, can_focus=True):
     def __init__(self, otp: "TOTPData") -> None:
         self.otp = otp
         super().__init__(
-            rich.text.Text(otp.name, overflow="ellipsis", no_wrap=True),
+            rich.text.Text(otp.name),
             classes=f"otp-name otp-name-{otp.id} otp-{otp.id}",
             expand=True,
         )
@@ -274,6 +274,7 @@ class TTOTP(App[None]):
     .otp-progress { width: 12; }
     .otp-value { width: 9; }
     .otp-hidden { display: none; }
+    .otp-name { text-wrap: nowrap; text-overflow: ellipsis; }
     TOTPLabel { width: 1fr; height: 1; padding: 0 1; }
     Horizontal:focus-within { background: $primary-background; }
     Bar > .bar--bar { color: $success; }
@@ -396,9 +397,7 @@ class TTOTP(App[None]):
                     parent = name_widget.parent
                     assert parent is not None
                     parent.remove_class("otp-hidden")
-                    name_widget.update(
-                        rich.text.Text(otp.name, overflow="ellipsis", no_wrap=True)
-                    )
+                    name_widget.update(rich.text.Text(otp.name))
                 return
 
             matcher = Matcher(needle)
@@ -409,8 +408,6 @@ class TTOTP(App[None]):
                 score = matcher.match(otp.name)
                 if score > 0:
                     highlighted = matcher.highlight(otp.name)
-                    highlighted.overflow = "ellipsis"
-                    highlighted.no_wrap = True
                     name_widget.update(highlighted)
                     parent.remove_class("otp-hidden")
                 else:

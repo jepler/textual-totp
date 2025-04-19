@@ -33,7 +33,7 @@ jobs:
 
     - name: Upload patch
       if: failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: patch
         path: ~/pre-commit.patch
@@ -58,7 +58,7 @@ jobs:
       run: python -mbuild
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: dist
         path: dist/*
