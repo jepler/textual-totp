@@ -126,35 +126,16 @@ def parse_uri(uri: str) -> pyotp.TOTP:
 default_conffile = platformdirs.user_config_path("ttotp") / "settings.toml"
 
 
-class _common_actions:
-    app: Any  # avoid mypy diagnostics about properties of self.app
-
-    def action_focus_next(self) -> None:
-        self.app.screen.focus_next()
-
-    def action_focus_previous(self) -> None:
-        self.app.screen.focus_previous()
-
-    def action_copy(self) -> None:
-        self.app.action_copy()
-
-    def action_show(self) -> None:
-        self.app.action_show()
-
-    def action_clear_search(self) -> None:
-        self.app.action_clear_search()
-
-
-class TOTPLabel(_common_actions, Label, can_focus=True, inherit_bindings=True):
+class TOTPLabel(Label, can_focus=True, inherit_bindings=True):
     otp: "TOTPData"
 
     BINDINGS = [
-        Binding("c", "copy", "Copy code", show=True),
-        Binding("s", "show", "Show code", show=True),
-        Binding("up", "focus_previous", show=False),
-        Binding("down", "focus_next", show=False),
-        Binding("k", "focus_previous", show=False),
-        Binding("j", "focus_next", show=False),
+        Binding("c", "app.copy", "Copy code", show=True),
+        Binding("s", "app.show", "Show code", show=True),
+        Binding("up", "app.focus_previous", show=False),
+        Binding("down", "app.focus_next", show=False),
+        Binding("k", "app.focus_previous", show=False),
+        Binding("j", "app.focus_next", show=False),
     ]
 
     def __init__(self, otp: "TOTPData") -> None:
@@ -190,10 +171,10 @@ class TOTPLabel(_common_actions, Label, can_focus=True, inherit_bindings=True):
         self.shown = False
 
 
-class SearchInput(_common_actions, Input, can_focus=False):
+class SearchInput(Input, can_focus=False):
     BINDINGS = [
-        Binding("up", "focus_previous", show=False),
-        Binding("down", "focus_next", show=False),
+        Binding("up", "app.focus_previous", show=False),
+        Binding("down", "app.focus_next", show=False),
         Binding("ctrl+a", "clear_search", "Show all", show=True),
         Binding("escape", "clear_search", show=True),
     ]
