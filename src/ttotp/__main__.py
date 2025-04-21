@@ -30,8 +30,6 @@ import pyotp
 import platformdirs
 import tomllib
 
-from textual._ansi_sequences import ANSI_SEQUENCES_KEYS
-from textual.keys import Keys
 from typing import TypeGuard  # use `typing_extensions` for Python 3.9 and below
 
 # workaround for pyperclip being un-typed
@@ -52,12 +50,6 @@ def is_str_list(val: Any) -> TypeGuard[list[str]]:
     if not isinstance(val, list):
         return False
     return all(isinstance(x, str) for x in val)
-
-
-# Monkeypatch escape key as meaning "F9", WFM
-# ignore typing here because ANSI_SEQUENCES_KEYS is a Mapping[] which is read-only as
-# far as mypy is concerned.
-ANSI_SEQUENCES_KEYS["\x1b\x1b"] = (Keys.F9,)  # type: ignore
 
 
 # Copied from pyotp with the issuer mismatch check removed and HTOP support removed
@@ -134,7 +126,26 @@ def parse_uri(uri: str) -> pyotp.TOTP:
 default_conffile = platformdirs.user_config_path("ttotp") / "settings.toml"
 
 
-class TOTPLabel(Label, can_focus=True):
+class _common_actions:
+    app: Any  # avoid mypy diagnostics about properties of self.app
+
+    def action_focus_next(self) -> None:
+        self.app.screen.focus_next()
+
+    def action_focus_previous(self) -> None:
+        self.app.screen.focus_previous()
+
+    def action_copy(self) -> None:
+        self.app.action_copy()
+
+    def action_show(self) -> None:
+        self.app.action_show()
+
+    def action_clear_search(self) -> None:
+        self.app.action_clear_search()
+
+
+class TOTPLabel(_common_actions, Label, can_focus=True, inherit_bindings=True):
     otp: "TOTPData"
 
     BINDINGS = [
@@ -179,12 +190,12 @@ class TOTPLabel(Label, can_focus=True):
         self.shown = False
 
 
-class SearchInput(Input, can_focus=False):
+class SearchInput(_common_actions, Input, can_focus=False):
     BINDINGS = [
         Binding("up", "focus_previous", show=False),
         Binding("down", "focus_next", show=False),
         Binding("ctrl+a", "clear_search", "Show all", show=True),
-        Binding("F9", "clear_search", show=True),
+        Binding("escape", "clear_search", show=True),
     ]
 
     def on_focus(self) -> None:
@@ -275,6 +286,7 @@ class TTOTP(App[None]):
     .otp-value { width: 9; }
     .otp-hidden { display: none; }
     .otp-name { text-wrap: nowrap; text-overflow: ellipsis; }
+    .otp-name:focus { background: red; }
     TOTPLabel { width: 1fr; height: 1; padding: 0 1; }
     Horizontal:focus-within { background: $primary-background; }
     Bar > .bar--bar { color: $success; }
