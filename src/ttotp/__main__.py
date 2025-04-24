@@ -423,7 +423,7 @@ class TTOTP(App[None]):
     "--profile",
     type=str,
     default=None,
-    help="Profile to use within the configuration file",
+    help="Profile to use within the configuration file (case sensitive). Use `--profile list` to list profiles",
 )
 def main(config: pathlib.Path, profile: str) -> None:
     def config_hint(extra: str) -> None:
@@ -455,6 +455,10 @@ multiple profiles as configuration file sections, and select one with
 
     with open(config, "rb") as f:
         config_data = tomllib.load(f)
+
+    if profile == "list":
+        print("Profile names:" + " ".join(config_data.keys()))
+        raise SystemExit(0)
 
     if profile:
         profile_data = config_data.get(profile, None)
