@@ -6,6 +6,7 @@
 
 from dataclasses import dataclass, field
 
+import signal
 import time
 import hashlib
 import pathlib
@@ -35,6 +36,13 @@ from typing import TypeGuard  # use `typing_extensions` for Python 3.9 and below
 # workaround for pyperclip being un-typed
 if TYPE_CHECKING:
 
+    class CopyProcessor:
+        def do_copy(self, data: str) -> None:
+            ...
+
+        def do_clear_copy(self) -> bool:
+            ...
+
     def pyperclip_paste() -> str:
         ...
 
@@ -43,6 +51,63 @@ if TYPE_CHECKING:
 else:
     from pyperclip import paste as pyperclip_paste
     from pyperclip import copy as pyperclip_copy
+
+
+def command_exists(s: str) -> bool:
+    status = subprocess.run(
+        ["which", s],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+    )
+    return status.returncode == 0
+
+
+@dataclass
+class PyperclipCopyProcessor:
+    copied: str = ""
+
+    def do_copy(self, data: str) -> None:
+        self.copied = data
+
+    def do_clear_copy(self) -> bool:
+        if self.copied and pyperclip_paste() == self.copied:
+            pyperclip_copy("")
+            return True
+        return False
+
+
+@dataclass
+class XClipCopyProcessor:
+    process: subprocess.Popen[bytes] | None = None
+
+    def do_copy(self, data: str) -> None:
+        self.do_clear_copy()
+        self.process = subprocess.Popen(
+            ["xclip", "-verbose", "-sel", "c"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.PIPE,
+        )
+        assert self.process.stdin is not None  # mypy worries about this at night
+        self.process.stdin.write(data.encode("utf-8"))
+        self.process.stdin.close()
+
+    def do_clear_copy(self) -> bool:
+        if self.process is None:
+            return False
+        self.process.send_signal(signal.SIGINT)
+        returncode = self.process.wait(0.1)
+        if returncode is None:
+            self.process.send_signal(signal.SIGKILL)
+            returncode = self.process.wait(0.1)
+        self.process = None
+        return True
+
+
+copy_processor = (
+    XClipCopyProcessor() if command_exists("xclip") else PyperclipCopyProcessor()
+)
 
 
 def is_str_list(val: Any) -> TypeGuard[list[str]]:
@@ -319,9 +384,8 @@ class TTOTP(App[None]):
         self.notify("Will exit soon due to inactivity", title="Auto-exit")
 
     def clear_clipboard_func(self) -> None:
-        if pyperclip_paste() == self.copied:
+        if copy_processor.do_clear_copy():
             self.notify("Clipboard cleared", title="")
-            pyperclip_copy("")
 
     def timer_func(self) -> None:
         now = time.time()
@@ -350,8 +414,7 @@ class TTOTP(App[None]):
         if widget is not None:
             otp = cast(TOTPLabel, widget).otp
             code = otp.totp.now()
-            pyperclip_copy(code)
-            self.copied = code
+            copy_processor.do_copy(code)
             if self.clear_clipboard_timer is not None:
                 self.clear_clipboard_timer.pause()
 
