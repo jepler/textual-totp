@@ -290,7 +290,7 @@ class TTOTP(App[None]):
         self.tokens = tokens
         self.otp_data: list[TOTPData] = []
         self.timer: Timer | None = None
-        self.clear_clipboard_time: Timer | None = None
+        self.clear_clipboard_timer: Timer | None = None
         self.exit_time: Timer | None = None
         self.warn_exit_time: Timer | None = None
         self.timeout: int | float | None = timeout
@@ -299,9 +299,6 @@ class TTOTP(App[None]):
     def on_mount(self) -> None:
         self.timer_func()
         self.timer = self.set_interval(1, self.timer_func)
-        self.clear_clipboard_timer = self.set_timer(
-            30, self.clear_clipboard_func, pause=True
-        )
         if self.timeout:
             self.exit_time = self.set_timer(self.timeout, self.action_quit)
             warn_timeout = max(self.timeout / 2, self.timeout - 10)
@@ -355,10 +352,15 @@ class TTOTP(App[None]):
             code = otp.totp.now()
             pyperclip_copy(code)
             self.copied = code
-            self.clear_clipboard_timer.reset()
-            self.clear_clipboard_timer.resume()
+            if self.clear_clipboard_timer is not None:
+                self.clear_clipboard_timer.pause()
 
-            self.notify("Code copied", title="")
+            now = time.time()
+            interval = otp.totp.interval
+            _, progress = divmod(now, interval)
+            left = 1.5 * interval - progress
+            self.clear_clipboard_timer = self.set_timer(left, self.clear_clipboard_func)
+            self.notify(f"Will clear in {left:.1f}s", title="Code Copied")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         button = cast(TOTPButton, event.button)
