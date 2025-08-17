@@ -6,6 +6,7 @@
 
 from dataclasses import dataclass, field
 
+import signal
 import time
 import hashlib
 import pathlib
@@ -19,7 +20,7 @@ from textual.fuzzy import Matcher
 from textual.app import App, ComposeResult
 from textual.events import Key, MouseDown, MouseUp, MouseScrollDown, MouseScrollUp
 from textual.widget import Widget
-from textual.widgets import Label, Footer, ProgressBar, Button, Input
+from textual.widgets import Label, Footer, Button, Input
 from textual.binding import Binding
 from textual.containers import VerticalScroll, Horizontal
 from textual.css.query import DOMQuery
@@ -30,10 +31,19 @@ import pyotp
 import platformdirs
 import tomllib
 
+from .TinyProgress import TinyProgress as ProgressBar
+
 from typing import TypeGuard  # use `typing_extensions` for Python 3.9 and below
 
 # workaround for pyperclip being un-typed
 if TYPE_CHECKING:
+
+    class CopyProcessor:
+        def do_copy(self, data: str) -> None:
+            ...
+
+        def do_clear_copy(self) -> bool:
+            ...
 
     def pyperclip_paste() -> str:
         ...
@@ -43,6 +53,63 @@ if TYPE_CHECKING:
 else:
     from pyperclip import paste as pyperclip_paste
     from pyperclip import copy as pyperclip_copy
+
+
+def command_exists(s: str) -> bool:
+    status = subprocess.run(
+        ["which", s],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+    )
+    return status.returncode == 0
+
+
+@dataclass
+class PyperclipCopyProcessor:
+    copied: str = ""
+
+    def do_copy(self, data: str) -> None:
+        self.copied = data
+
+    def do_clear_copy(self) -> bool:
+        if self.copied and pyperclip_paste() == self.copied:
+            pyperclip_copy("")
+            return True
+        return False
+
+
+@dataclass
+class XClipCopyProcessor:
+    process: subprocess.Popen[bytes] | None = None
+
+    def do_copy(self, data: str) -> None:
+        self.do_clear_copy()
+        self.process = subprocess.Popen(
+            ["xclip", "-verbose", "-sel", "c"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.PIPE,
+        )
+        assert self.process.stdin is not None  # mypy worries about this at night
+        self.process.stdin.write(data.encode("utf-8"))
+        self.process.stdin.close()
+
+    def do_clear_copy(self) -> bool:
+        if self.process is None:
+            return False
+        self.process.send_signal(signal.SIGINT)
+        returncode = self.process.wait(0.1)
+        if returncode is None:
+            self.process.send_signal(signal.SIGKILL)
+            returncode = self.process.wait(0.1)
+        self.process = None
+        return True
+
+
+copy_processor = (
+    XClipCopyProcessor() if command_exists("xclip") else PyperclipCopyProcessor()
+)
 
 
 def is_str_list(val: Any) -> TypeGuard[list[str]]:
@@ -261,21 +328,21 @@ def search_preprocess(s: str) -> str:
 
 
 class TTOTP(App[None]):
+    HORIZONTAL_BREAKPOINTS = [(0, "-narrow"), (60, "-normal"), (120, "-very-wide")]
     CSS = """
     VerticalScroll { min-height: 1; }
-    .otp-progress { width: 12; }
     .otp-value { width: 9; }
     .otp-hidden { display: none; }
     .otp-name { text-wrap: nowrap; text-overflow: ellipsis; }
     .otp-name:focus { background: red; }
     TOTPLabel { width: 1fr; height: 1; padding: 0 1; }
     Horizontal:focus-within { background: $primary-background; }
-    Bar > .bar--bar { color: $success; }
-    Bar { width: 1fr; }
+    OneCellBar > .bar--bar { color: $success; }
     Button { border: none; height: 1; width: 3; min-width: 4 }
     Horizontal { height: 1; }
     Input { border: none; height: 1; width: 1fr; }
     Input.error { background: $error; }
+    .-narrow TOTPButton { display: None; }
     """
 
     BINDINGS = [
@@ -290,7 +357,7 @@ class TTOTP(App[None]):
         self.tokens = tokens
         self.otp_data: list[TOTPData] = []
         self.timer: Timer | None = None
-        self.clear_clipboard_time: Timer | None = None
+        self.clear_clipboard_timer: Timer | None = None
         self.exit_time: Timer | None = None
         self.warn_exit_time: Timer | None = None
         self.timeout: int | float | None = timeout
@@ -299,9 +366,6 @@ class TTOTP(App[None]):
     def on_mount(self) -> None:
         self.timer_func()
         self.timer = self.set_interval(1, self.timer_func)
-        self.clear_clipboard_timer = self.set_timer(
-            30, self.clear_clipboard_func, pause=True
-        )
         if self.timeout:
             self.exit_time = self.set_timer(self.timeout, self.action_quit)
             warn_timeout = max(self.timeout / 2, self.timeout - 10)
@@ -322,9 +386,8 @@ class TTOTP(App[None]):
         self.notify("Will exit soon due to inactivity", title="Auto-exit")
 
     def clear_clipboard_func(self) -> None:
-        if pyperclip_paste() == self.copied:
+        if copy_processor.do_clear_copy():
             self.notify("Clipboard cleared", title="")
-            pyperclip_copy("")
 
     def timer_func(self) -> None:
         now = time.time()
@@ -353,12 +416,16 @@ class TTOTP(App[None]):
         if widget is not None:
             otp = cast(TOTPLabel, widget).otp
             code = otp.totp.now()
-            pyperclip_copy(code)
-            self.copied = code
-            self.clear_clipboard_timer.reset()
-            self.clear_clipboard_timer.resume()
+            copy_processor.do_copy(code)
+            if self.clear_clipboard_timer is not None:
+                self.clear_clipboard_timer.pause()
 
-            self.notify("Code copied", title="")
+            now = time.time()
+            interval = otp.totp.interval
+            _, progress = divmod(now, interval)
+            left = 1.5 * interval - progress
+            self.clear_clipboard_timer = self.set_timer(left, self.clear_clipboard_func)
+            self.notify(f"Will clear in {left:.1f}s", title="Code Copied")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         button = cast(TOTPButton, event.button)
@@ -421,7 +488,7 @@ class TTOTP(App[None]):
     "--profile",
     type=str,
     default=None,
-    help="Profile to use within the configuration file",
+    help="Profile to use within the configuration file (case sensitive). Use `--profile list` to list profiles",
 )
 def main(config: pathlib.Path, profile: str) -> None:
     def config_hint(extra: str) -> None:
@@ -454,11 +521,16 @@ multiple profiles as configuration file sections, and select one with
     with open(config, "rb") as f:
         config_data = tomllib.load(f)
 
+    if profile == "list":
+        print("Profile names:" + " ".join(config_data.keys()))
+        raise SystemExit(0)
+
     if profile:
         profile_data = config_data.get(profile, None)
         if profile_data is None:
             config_hint(f"The profile {profile!r} file does not exist.")
-        config_data.update(profile_data)
+        else:
+            config_data.update(profile_data)
 
     otp_command = config_data.get("otp-command")
     if otp_command is None:
