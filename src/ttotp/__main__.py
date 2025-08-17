@@ -328,6 +328,7 @@ def search_preprocess(s: str) -> str:
 
 
 class TTOTP(App[None]):
+    HORIZONTAL_BREAKPOINTS = [(0, "-narrow"), (60, "-normal"), (120, "-very-wide")]
     CSS = """
     VerticalScroll { min-height: 1; }
     .otp-value { width: 9; }
@@ -341,6 +342,7 @@ class TTOTP(App[None]):
     Horizontal { height: 1; }
     Input { border: none; height: 1; width: 1fr; }
     Input.error { background: $error; }
+    .-narrow TOTPButton { display: None; }
     """
 
     BINDINGS = [
