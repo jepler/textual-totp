@@ -20,7 +20,7 @@ from textual.fuzzy import Matcher
 from textual.app import App, ComposeResult
 from textual.events import Key, MouseDown, MouseUp, MouseScrollDown, MouseScrollUp
 from textual.widget import Widget
-from textual.widgets import Label, Footer, ProgressBar, Button, Input
+from textual.widgets import Label, Footer, Button, Input
 from textual.binding import Binding
 from textual.containers import VerticalScroll, Horizontal
 from textual.css.query import DOMQuery
@@ -30,6 +30,8 @@ import click
 import pyotp
 import platformdirs
 import tomllib
+
+from .TinyProgress import TinyProgress as ProgressBar
 
 from typing import TypeGuard  # use `typing_extensions` for Python 3.9 and below
 
@@ -328,15 +330,13 @@ def search_preprocess(s: str) -> str:
 class TTOTP(App[None]):
     CSS = """
     VerticalScroll { min-height: 1; }
-    .otp-progress { width: 12; }
     .otp-value { width: 9; }
     .otp-hidden { display: none; }
     .otp-name { text-wrap: nowrap; text-overflow: ellipsis; }
     .otp-name:focus { background: red; }
     TOTPLabel { width: 1fr; height: 1; padding: 0 1; }
     Horizontal:focus-within { background: $primary-background; }
-    Bar > .bar--bar { color: $success; }
-    Bar { width: 1fr; }
+    OneCellBar > .bar--bar { color: $success; }
     Button { border: none; height: 1; width: 3; min-width: 4 }
     Horizontal { height: 1; }
     Input { border: none; height: 1; width: 1fr; }
@@ -527,7 +527,8 @@ multiple profiles as configuration file sections, and select one with
         profile_data = config_data.get(profile, None)
         if profile_data is None:
             config_hint(f"The profile {profile!r} file does not exist.")
-        config_data.update(profile_data)
+        else:
+            config_data.update(profile_data)
 
     otp_command = config_data.get("otp-command")
     if otp_command is None:
