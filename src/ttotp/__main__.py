@@ -120,10 +120,10 @@ class Qr(ModalScreen[None]):
 
     def __init__(self, url: str) -> None:
         self.url = url
-        super().__init__()
+        super().__init__(classes="Qr")
 
     def compose(self) -> ComposeResult:
-        q = qrcode.QRCode()
+        q = qrcode.QRCode(error_correction=qrcode.ERROR_CORRECT_L)
         q.add_data(self.url)
         out = io.StringIO()
         q.print_ascii(out=out)
@@ -368,10 +368,10 @@ class TTOTP(App[None]):
     Input.error { background: $error; }
     .-narrow TOTPButton { display: None; }
 
+    Qr { align: center middle; }
     #dialog {
-        align: center middle;
-        width: auto;
         height: auto;
+        width: auto;
         border: thick $background 80%;
         background: $surface;
     }
