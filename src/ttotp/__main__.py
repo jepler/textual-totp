@@ -6,7 +6,6 @@
 
 from dataclasses import dataclass, field
 
-import io
 import signal
 import time
 import hashlib
@@ -35,6 +34,7 @@ import tomllib
 import qrcode
 
 from .TinyProgress import TinyProgress as ProgressBar
+from .sixel import matrix_to_sixel
 
 from typing import TypeGuard  # use `typing_extensions` for Python 3.9 and below
 
@@ -118,6 +118,10 @@ copy_processor = (
 class Qr(ModalScreen[None]):
     """Displays a QR code in a modal dialog"""
 
+    BINDINGS = [
+        Binding("escape", "dismiss", "Close", show=True),
+    ]
+
     def __init__(self, url: str) -> None:
         self.url = url
         super().__init__(classes="Qr")
@@ -125,9 +129,7 @@ class Qr(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         q = qrcode.QRCode(error_correction=qrcode.ERROR_CORRECT_L)
         q.add_data(self.url)
-        out = io.StringIO()
-        q.print_ascii(out=out)
-        content = out.getvalue()
+        content = matrix_to_sixel(q.get_matrix())
         yield Vertical(Label(content), Button("OK"), id="dialog")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -375,7 +377,7 @@ class TTOTP(App[None]):
         border: thick $background 80%;
         background: $surface;
     }
-    #dialog Button { align: center middle; }
+    #dialog Button { width: 100%; }
     """
 
     BINDINGS = [
