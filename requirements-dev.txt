@@ -6,4 +6,5 @@
 mypy
 build
 setuptools>=68.2.2
+types-qrcode
 wheel

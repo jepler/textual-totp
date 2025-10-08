@@ -16,22 +16,25 @@ import re
 from typing import TYPE_CHECKING, Any, Sequence, cast
 
 import rich.text
-from textual.fuzzy import Matcher
 from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Vertical, VerticalScroll, Horizontal
+from textual.css.query import DOMQuery
 from textual.events import Key, MouseDown, MouseUp, MouseScrollDown, MouseScrollUp
+from textual.fuzzy import Matcher
+from textual.screen import ModalScreen
+from textual.timer import Timer
 from textual.widget import Widget
 from textual.widgets import Label, Footer, Button, Input
-from textual.binding import Binding
-from textual.containers import VerticalScroll, Horizontal
-from textual.css.query import DOMQuery
-from textual.timer import Timer
 
 import click
 import pyotp
 import platformdirs
 import tomllib
+import qrcode
 
 from .TinyProgress import TinyProgress as ProgressBar
+from .sixel import matrix_to_sixel
 
 from typing import TypeGuard  # use `typing_extensions` for Python 3.9 and below
 
@@ -110,6 +113,28 @@ class XClipCopyProcessor:
 copy_processor = (
     XClipCopyProcessor() if command_exists("xclip") else PyperclipCopyProcessor()
 )
+
+
+class Qr(ModalScreen[None]):
+    """Displays a QR code in a modal dialog"""
+
+    BINDINGS = [
+        Binding("escape", "dismiss", "Close", show=True),
+    ]
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        super().__init__(classes="Qr")
+
+    def compose(self) -> ComposeResult:
+        q = qrcode.QRCode(error_correction=qrcode.ERROR_CORRECT_L)
+        q.add_data(self.url)
+        content = matrix_to_sixel(q.get_matrix())
+        yield Vertical(Label(content), Button("OK"), id="dialog")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss()
+        event.stop()
 
 
 def is_str_list(val: Any) -> TypeGuard[list[str]]:
@@ -197,6 +222,7 @@ class TOTPLabel(Label, can_focus=True, inherit_bindings=True):
     otp: "TOTPData"
 
     BINDINGS = [
+        Binding("p", "app.show_qr", "Show Provisioning QR code", show=True),
         Binding("c", "app.copy", "Copy code", show=True),
         Binding("s", "app.show", "Show code", show=True),
         Binding("up", "app.focus_previous", show=False),
@@ -338,11 +364,20 @@ class TTOTP(App[None]):
     TOTPLabel { width: 1fr; height: 1; padding: 0 1; }
     Horizontal:focus-within { background: $primary-background; }
     OneCellBar > .bar--bar { color: $success; }
-    Button { border: none; height: 1; width: 3; min-width: 4 }
+    TOTPButton { border: none; height: 1; width: 3; min-width: 4 }
     Horizontal { height: 1; }
     Input { border: none; height: 1; width: 1fr; }
     Input.error { background: $error; }
     .-narrow TOTPButton { display: None; }
+
+    Qr { align: center middle; }
+    #dialog {
+        height: auto;
+        width: auto;
+        border: thick $background 80%;
+        background: $surface;
+    }
+    #dialog Button { width: 100%; }
     """
 
     BINDINGS = [
@@ -404,6 +439,12 @@ class TTOTP(App[None]):
                 with Horizontal():
                     yield from data.widgets
         yield SearchInput(id="search", placeholder="Type / to search")
+
+    def action_show_qr(self) -> None:
+        widget = self.focused
+        if widget is not None:
+            otp = cast(TOTPLabel, widget).otp.totp
+            self.push_screen(Qr(otp.provisioning_uri()))
 
     def action_show(self) -> None:
         widget = self.focused
